@@ -106,7 +106,7 @@
     {{ log(activity_name~' insert activity sql: '~insert_activity_sql)}}
     {%- set tmp_activity_statement = 'main_' ~ activity_name ~ '_tmp' -%}
     {%- call statement(tmp_activity_statement, fetch_result=True) -%}
-      {{ create_table_as(temporary=true, relation=tmp_activity_relation, sql=insert_activity_sql) }}
+      {{ get_create_table_as_sql(temporary=true, relation=tmp_activity_relation, sql=insert_activity_sql) }}
     {%- endcall -%}
     {{ log('created temp table for activity '~activity_name) }}
 
