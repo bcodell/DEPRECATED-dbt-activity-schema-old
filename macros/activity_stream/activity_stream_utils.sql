@@ -201,7 +201,7 @@ cluster by ({{activity_name_col}}, {{entity_id}})
 
 {% macro snowflake__get_cluster_keys(entity_id) %}
 {%- set activity_name_col = dbt_activity_schema.get_activity_name_col() -%}
-cluster by ({{activity_name_col}}, {{entity_id}})
+cluster by {{entity_id}}
 {% endmacro %}
 
 {% macro bigquery__get_cluster_keys(entity_id) %}
