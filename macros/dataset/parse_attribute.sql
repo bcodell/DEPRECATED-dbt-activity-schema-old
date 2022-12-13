@@ -51,6 +51,6 @@ cast(nullif({{dbt_activity_schema.parse_json('attributes', attribute)}}, '') as 
 {%- if attribute_name in ['activity_id', 'activity_at', entity_id] -%}
 {{coalesce_prefix}}{{attribute_name}}{{condition_str}}{{coalesce_suffix}}
 {%- else -%}
-{{coalesce_prefix}}cast(nullif({{dbt_activity_schema.parse_json('attributes', attribute_name)}}, ''){{condition_str}}as {{data_type}}){{coalesce_suffix}}
+{{coalesce_prefix}}cast(nullif({{dbt_activity_schema.parse_json('attributes', attribute_name)}}, '')as {{data_type}}){{condition_str}}{{coalesce_suffix}}
 {%- endif -%}
 {%- endmacro -%}
