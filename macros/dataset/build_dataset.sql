@@ -170,7 +170,7 @@
 with {{sql_graph['primary_activity_cte']}} as (
     select
         {%- for sc in standard_columns -%}
-        {% set primary_sc = sql_graph['primary_activity']~'_'~sc %}
+        {% set primary_sc = dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])~'_'~sc %}
         {% if not loop.first %}, {% endif %}{{sc}} as {{primary_sc}}
         {%- do primary_columns.append(primary_sc) -%}
         {% endfor %}
@@ -238,15 +238,15 @@ with {{sql_graph['primary_activity_cte']}} as (
 {%- set join_reqs = se['joins'][j] -%}
 , {{join_reqs['table_alias']}} as (
     select
-        enriched.{{sql_graph['primary_activity']}}_{{entity_id}}
-        , enriched.{{sql_graph['primary_activity']}}_activity_id
+        enriched.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}}
+        , enriched.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
         {%- for sm in join_reqs['aggregations'] %}
         , {{sm['aggregation_sql']}} as {{sm['aggregation_name']}}
         {%- endfor %}
     from enriched
     {%- set alias = join_reqs['table_alias'] %}
     left join {{se['cte']}} {{alias}}
-        on enriched.{{sql_graph['primary_activity']}}_{{entity_id}} = {{alias}}.{{secondary_activity}}_{{entity_id}}
+        on enriched.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}} = {{alias}}.{{secondary_activity}}_{{entity_id}}
         {%- if join_reqs['after_ts'] is not none %}
         and {{dbt_activity_schema.compile_timestamp_join(
             primary_activity=sql_graph['primary_activity'],
@@ -293,7 +293,7 @@ with {{sql_graph['primary_activity_cte']}} as (
     {%- set join_reqs = se['joins'][j] -%}
     {%- set alias = join_reqs['table_alias'] -%}
     left join {{alias}}
-        on enriched.{{sql_graph['primary_activity']}}_activity_id = {{alias}}.{{sql_graph['primary_activity']}}_activity_id
+        on enriched.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id = {{alias}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
     {% endfor %}
     {%- endfor -%}
 
