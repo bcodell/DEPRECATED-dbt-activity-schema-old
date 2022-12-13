@@ -48,6 +48,11 @@
 
 
   -- setup
+  -- open with begin statement so that if failure occurs everything rolls back
+  {% call statement('begin', fetch_result=True) %}
+    begin;
+  {%- endcall -%}
+
   -- create temp relation and table if table materialization strategy or full_refresh flag
   {%- if full_refresh -%}
     {%- set tmp_identifier = identifier ~ '__dbt_activity_schema' ~ '_tmp' -%}
@@ -114,7 +119,7 @@
     {%- set main_activity_name = 'main-' ~ activity_name -%}
     {{ log('insert activity stream query: '~insert_activity_stream) }}
     {% call statement(main_activity_name, fetch_result=True) -%}
-      insert into {%- if full_refresh -%}{{tmp_relation}}{%- else -%}{{target_relation}}{%- endif -%} ({{insert_target_columns}})
+      insert into {% if full_refresh %}{{tmp_relation}}{% else %}{{target_relation}}{% endif %} ({{insert_target_columns}})
       (
           select
               {{insert_target_columns}}
