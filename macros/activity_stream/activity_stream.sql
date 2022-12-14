@@ -118,7 +118,7 @@
       (
           select
               {{insert_target_columns}}
-          from {{tmp_activity_relation.include(schema=False)}}
+          from {{tmp_activity_relation.include(schema=True, database=True)}}
       );
     {%- endcall %}
     {{ adapter.drop_relation(tmp_activity_relation) }}
