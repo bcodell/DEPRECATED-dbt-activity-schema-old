@@ -72,7 +72,11 @@
     {%- endcall -%}
     {{ log('created target ctas') }}
   {%- endif -%}
-  {% set target_columns = adapter.get_columns_in_relation(target_relation) %}
+  {%- if full_refresh -%}
+    {% set target_columns = adapter.get_columns_in_relation(tmp_relation) %}
+  {%- else -%}
+    {% set target_columns = adapter.get_columns_in_relation(target_relation) %}
+  {%- endif -%}
   {%- set insert_target_columns = target_columns | map(attribute='quoted') | join(', ') -%}
   {{ log('target cols: '~insert_target_columns) }}
 
