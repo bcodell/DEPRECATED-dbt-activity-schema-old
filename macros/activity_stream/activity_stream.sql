@@ -143,7 +143,9 @@
   {{ log('tmp: '~tmp_relation) }}
   {%- if full_refresh -%}
   {# if full_refresh, then swap existing table with temp table #}
+    {%- if relation_exists -%}
     {{ adapter.rename_relation(old_relation, backup_relation) }}
+    {%- endif -%}
     {{ adapter.rename_relation(tmp_relation, target_relation) }}
     {{ adapter.drop_relation(backup_relation) }}
     {{ adapter.drop_relation(tmp_relation) }}
