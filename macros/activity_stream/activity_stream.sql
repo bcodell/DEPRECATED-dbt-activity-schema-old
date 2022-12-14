@@ -97,7 +97,7 @@
     {%- endif -%}
     {{ log('max_ts: '~max_ts) }}
     {%- set tmp_activity_identifier = activity_name ~ '_tmp' -%}
-    {%- set tmp_activity_relation = api.Relation.create(identifier=tmp_activity_identifier, type='table') -%}
+    {%- set tmp_activity_relation = api.Relation.create(identifier=tmp_activity_identifier, database=database, schema=schema, type='table') -%}
     {%- set insert_activity_sql = dbt_activity_schema.generate_select_activity_sql(
       entity_id=entity_id,
       activity_name=activity_name,
