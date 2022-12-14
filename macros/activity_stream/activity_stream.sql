@@ -62,8 +62,8 @@
       {{ dbt_activity_schema.create_empty_activity_stream(entity_id=entity_id, relation=tmp_relation) }}
     {%- endcall -%}
   {%- endif -%}
-  -- create empty table if doesn't exist
-  {%- if not relation_exists -%}
+  -- create empty table if doesn't exist for incremental
+  {%- if not relation_exists and materialization_strategy == 'incremental' -%}
     {{ log('relation not exists') }}
     {%- set create_target_sql = dbt_activity_schema.generate_select_activity_sql(entity_id=entity_id) -%}
     {{ log('create_target_sql: '~create_target_sql) }}
