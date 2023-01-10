@@ -3,7 +3,7 @@
 {%- endmacro -%}
 
 {%- macro default__early_timestamp() -%}
-    cast('100-01-01' as {{dbt_activity_schema.type_timestamp()}})
+    cast('100-01-01' as {{type_timestamp()}})
 {%- endmacro -%}
 
 
