@@ -188,25 +188,25 @@ with {{sql_graph['primary_activity_cte']}} as (
         {%- do enriched_columns.append(col) -%}
         {% endfor %}
         {% if 'previous' in sql_graph['join_requirements'] %}
-        {%- set col_name = 'previous_'~primary_activity~'_activity_at' -%}
-        , max(t2.{{primary_activity}}_activity_at) as {{col_name}}
+        {%- set col_name = 'previous_'~cleaned_primary_activity~'_activity_at' -%}
+        , max(t2.{{cleaned_primary_activity}}_activity_at) as {{col_name}}
         {%- do enriched_columns.append(col_name) -%}
         {%- endif %}
         {%- if 'next' in sql_graph['join_requirements'] %}
-        {%- set col_name = 'next_'~primary_activity~'_activity_at' -%}
-        , min(t3.{{primary_activity}}_activity_at) as {{col_name}}
+        {%- set col_name = 'next_'~cleaned_primary_activity~'_activity_at' -%}
+        , min(t3.{{cleaned_primary_activity}}_activity_at) as {{col_name}}
         {%- do enriched_columns.append(col_name) -%}
         {%- endif %}
     from {{sql_graph['primary_activity_cte']}} t1
     {% if 'previous' in sql_graph['join_requirements'] -%}
     left join {{sql_graph['primary_activity_cte']}} t2
-        on t1.{{primary_activity}}_{{entity_id}} = t2.{{primary_activity}}_{{entity_id}}
-        and t1.{{primary_activity}}_activity_at > t2.{{primary_activity}}_activity_at
+        on t1.{{cleaned_primary_activity}}_{{entity_id}} = t2.{{cleaned_primary_activity}}_{{entity_id}}
+        and t1.{{cleaned_primary_activity}}_activity_at > t2.{{cleaned_primary_activity}}_activity_at
     {%- endif %}
     {%- if 'next' in sql_graph['join_requirements'] -%}
     left join {{sql_graph['primary_activity_cte']}} t3
-        on t1.{{primary_activity}}_{{entity_id}} = t3.{{primary_activity}}_{{entity_id}}
-        and t1.{{primary_activity}}_activity_at < t3.{{primary_activity}}_activity_at
+        on t1.{{cleaned_primary_activity}}_{{entity_id}} = t3.{{cleaned_primary_activity}}_{{entity_id}}
+        and t1.{{cleaned_primary_activity}}_activity_at < t3.{{cleaned_primary_activity}}_activity_at
     {%- endif %}
     group by
         {%- for col in primary_columns %}
@@ -249,7 +249,7 @@ with {{sql_graph['primary_activity_cte']}} as (
         on enriched.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}} = {{alias}}.{{secondary_activity}}_{{entity_id}}
         {%- if join_reqs['after_ts'] is not none %}
         and {{dbt_activity_schema.compile_timestamp_join(
-            primary_activity=sql_graph['primary_activity'],
+            primary_activity=dbt_activity_schema.remove_prefix(sql_graph['primary_activity']),
             secondary_activity=secondary_activity,
             secondary_alias=alias,
             relative='after',
@@ -258,7 +258,7 @@ with {{sql_graph['primary_activity_cte']}} as (
         {%- endif %}
         {%- if join_reqs['before_ts'] is not none %}
         and {{dbt_activity_schema.compile_timestamp_join(
-            primary_activity=sql_graph['primary_activity'],
+            primary_activity=dbt_activity_schema.remove_prefix(sql_graph['primary_activity']),
             secondary_activity=secondary_activity,
             secondary_alias=alias,
             relative='before',
