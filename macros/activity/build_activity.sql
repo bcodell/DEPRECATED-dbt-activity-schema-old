@@ -3,12 +3,12 @@ build_activity: Compiles a final select statement in a standardized format so th
     - cte: string; the name of the last CTE in the query containing all relevant columns to compile the activity model
 #}
 
-{% macro build_activity(cte) %}
-{{ adapter.dispatch('build_activity', 'dbt_activity_schema')(cte) }}
+{% macro build_activity(cte, unique_id_column=none) %}
+{{ adapter.dispatch('build_activity', 'dbt_activity_schema')(cte, unique_id_column) }}
 {% endmacro %}
 
 
-{% macro default__build_activity(cte) %}
+{% macro default__build_activity(cte, unique_id_column=none) %}
   {%- set model_name = dbt_activity_schema.remove_prefix(model.name) -%}
   {%- if execute -%}
     {%- set activity_stream = config.require('activity_stream') -%}
@@ -58,9 +58,13 @@ build_activity: Compiles a final select statement in a standardized format so th
 
   {% endif %}
 {%- set activity_at_column = dbt_activity_schema.get_activity_ts_col() -%}
+{%- set surrogate_key_fields = [entity_id, activity_at_column, "'"~model.name~"'"] -%}
+{%- if unique_id_column is not none -%}
+{%- do surrogate_key_fields.append(unique_id_column) -%}
+{%- endif -%}
 
 select
-    cast({{ dbt_activity_schema.surrogate_key([entity_id, activity_at_column, "'"~model.name~"'"]) }} as {{type_string()}}) as activity_id
+    cast({{ dbt_activity_schema.surrogate_key(surrogate_key_fields) }} as {{type_string()}}) as activity_id
     , cast({{ entity_id }} as {{type_string()}}) as {{ entity_id }}
     , cast('{{model_name}}' as {{type_string()}}) as activity_name
     , cast({{activity_at_column}} as {{type_timestamp()}}) as {{activity_at_column}}
