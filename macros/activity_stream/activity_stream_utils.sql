@@ -223,7 +223,7 @@ cluster by ({{activity_name_col}}, {{entity_id}})
 
 {% macro snowflake__get_cluster_keys(entity_id) %}
 {%- set activity_name_col = dbt_activity_schema.get_activity_name_col() -%}
-cluster by ({{entity_id}})
+cluster by (activity_name, activity_occurrence in (1, NULL), activity_repeated_at is NULL, to_date(activity_at))
 {% endmacro %}
 
 {% macro bigquery__get_cluster_keys(entity_id) %}
