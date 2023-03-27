@@ -140,6 +140,24 @@ vacuum {{relation}}
 {% endmacro %}
 
 
+{% macro get_activity_occurrence_col() %}
+    {{ return(adapter.dispatch('get_activity_occurrence_col', 'dbt_activity_schema')()) }}
+{% endmacro %}
+
+{% macro default__get_activity_occurrence_col() %}
+    {{ return('activity_occurrence') }}
+{% endmacro %}
+
+
+{% macro get_activity_repeated_at_col() %}
+    {{ return(adapter.dispatch('get_activity_repeated_at_col', 'dbt_activity_schema')()) }}
+{% endmacro %}
+
+{% macro default__get_activity_repeated_at_col() %}
+    {{ return('activity_repeated_at') }}
+{% endmacro %}
+
+
 {% macro get_activity_stream_schema(entity_id) %}
     {{ return(adapter.dispatch('get_activity_stream_schema', 'dbt_activity_schema')(entity_id)) }}
 {% endmacro %}
@@ -148,6 +166,8 @@ vacuum {{relation}}
 {%- set activity_ts_col = dbt_activity_schema.get_activity_ts_col() -%}
 {%- set activity_id_col = dbt_activity_schema.get_activity_id_col() -%}
 {%- set activity_name_col = dbt_activity_schema.get_activity_name_col() -%}
+{%- set activity_occurrence_col = dbt_activity_schema.get_activity_occurrence_col() -%}
+{%- set activity_repeated_at_col = dbt_activity_schema.get_activity_repeated_at_col() -%}
 {%- set attribues_col = dbt_activity_schema.get_attributes_col() -%}
 {%- set loaded_at_col = dbt_activity_schema.get_loaded_at_col() -%}
 {%- set base_columns = {
@@ -156,6 +176,8 @@ vacuum {{relation}}
     activity_name_col: {'data_type': type_string(), 'sql': activity_name_col},
     activity_ts_col: {'data_type': type_timestamp(), 'sql': activity_ts_col},
     attribues_col: {'data_type': dbt_activity_schema.type_json(), 'sql': attribues_col},
+    activity_occurrence_col: {'data_type': type_int(), 'sql': activity_occurrence_col},
+    activity_repeated_at_col: {'data_type': type_timestamp(), 'sql': activity_repeated_at_col},
     loaded_at_col: {'data_type': type_timestamp(), 'sql': current_timestamp()}
 } -%}
     {{ return(base_columns) }}
