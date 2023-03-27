@@ -63,12 +63,24 @@ build_activity: Compiles a final select statement in a standardized format so th
 {%- do surrogate_key_fields.append(unique_id_column) -%}
 {%- endif -%}
 
+{%- set surrogate_key_statement -%}
+cast({{ dbt_activity_schema.surrogate_key(surrogate_key_fields) }} as {{type_string()}})
+{%- endset -%}
+
 select
-    cast({{ dbt_activity_schema.surrogate_key(surrogate_key_fields) }} as {{type_string()}}) as activity_id
+    {{surrogate_key_statement}} as activity_id
     , cast({{ entity_id }} as {{type_string()}}) as {{ entity_id }}
     , cast('{{model_name}}' as {{type_string()}}) as activity_name
     , cast({{activity_at_column}} as {{type_timestamp()}}) as {{activity_at_column}}
     , {{ dbt_activity_schema.attributes_to_json(attributes) }} as attributes
+    , row_number() over (
+        partition by {{entity_id}}
+        order by {{activity_at_column}}, {{surrogate_key_statement}}
+    ) as activity_occurrence
+    , lead(cast({{activity_at_column}} as {{type_timestamp()}})) over (
+        partition by {{entity_id}}
+        order by {{activity_at_column}}, {{surrogate_key_statement}}
+    ) as activity_repeated_at
 from {{cte}}
 
 {% endmacro %}

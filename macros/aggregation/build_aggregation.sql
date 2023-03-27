@@ -8,8 +8,10 @@
 {%- set aggfunc = config.require('aggfunc') -%}
 {%- set after_timestamp = config.require('after_timestamp') -%}
 {%- set before_timestamp = config.require('before_timestamp') -%}
+{%- set relationship = config.require('relationship') -%}
 {%- set condition = config.get('condition', default=none) -%}
 {%- set backup_value = config.get('backup_value', default=none) -%}
+{%- set relationships = dbt_activity_schema._get_relationships() -%}
 
   {%- if execute -%}
     {# confirm aggregation materialization #}
@@ -41,7 +43,16 @@
       {%- endset -%}
       {{ exceptions.raise_compiler_error(error_message) }}
     {%- endif -%}
+
+    {# confirm valid relationship is specified #}
+    {%- if relationship not in relationships.keys() -%}
+        {%- set error_message -%}
+        Relationship '{{ relationship }}' is invalid for model '{{ model.unique_id }}'. Please specify a valid option from {{ relationships.keys() | join(', ') }}
+        {%- endset -%}
+        {{ exceptions.raise_compiler_error(error_message) }}
+    {%- endif -%}
   {%- endif -%}
+
 
 
 {{"-- depends_on: "~activity_stream}}

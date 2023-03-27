@@ -7,7 +7,9 @@
 {% set standard_columns = [
     'activity_id',
     entity_id,
-    'activity_at'
+    'activity_at',
+    'activity_occurrence',
+    'activity_repeated_at'
 ]
 %}
 {%- set project_name = model['unique_id'].split('.')[1] -%}
@@ -102,15 +104,17 @@
                 }) -%}
             {%- endif -%}
 
-            {%- set after_ts = node.config.after_timestamp -%}
-            {%- set before_ts = node.config.before_timestamp -%}
+            {%- set after_ts = node.config.get('after_timestamp', none) -%}
+            {%- set before_ts = node.config.get('before_timestamp', none) -%}
+            {%- set relationship = node.config.get('relationship') -%}
             {%- do sql_graph['join_requirements'].append(after_ts) -%}
             {%- do sql_graph['join_requirements'].append(before_ts) -%}
-            {%- set join_key = (after_ts, before_ts) -%}
-            {%- set table_alias = secondary_activity~'_'~dbt_activity_schema.remove_punctuation(after_ts)~'_'~dbt_activity_schema.remove_punctuation(before_ts) -%}
+            {%- set join_key = (relationship, after_ts, before_ts) -%}
+            {%- set table_alias = secondary_activity~'_'~relationship~'_'~dbt_activity_schema.remove_punctuation(after_ts)~'_'~dbt_activity_schema.remove_punctuation(before_ts) -%}
             {%- if join_key not in sql_graph['secondary_activities'][secondary_activity]['joins'].keys() -%}
                 {%- do sql_graph['secondary_activities'][secondary_activity]['joins'].update({
                     join_key: {
+                        'relationship': relationship,
                         'after_ts': after_ts,
                         'before_ts': before_ts,
                         'table_alias': table_alias,
@@ -125,11 +129,13 @@
             {{ log('secondary activity key '~secondary_activity_key) }}
             {%- set secondary_activity_node = graph.nodes.get(secondary_activity_key) -%}
             {{ log('secondary activity node '~secondary_activity_node) }}
-            {%- if attribute_name in ['activity_id', 'activity_name', 'activity_at'] -%}
+            {%- if attribute_name in ['activity_id', 'activity_name', 'activity_at', 'activity_repeated_at', 'activity_occurrence'] -%}
                 {%- set attribute_data_type = {
                     'activity_id': type_string(),
                     'activity_name': type_string(),
                     'activity_at': 'timestamp',
+                    'activity_repeated_at': 'timestamp',
+                    'activity_occurrence': type_int(),
                 }[attribute_name]
                 -%}
             {%- else -%}
@@ -157,7 +163,6 @@
 {% endif %}
 
 {%- set primary_columns = [] %}
-{%- set enriched_columns = [] %}
 {%- set cleaned_primary_activity = dbt_activity_schema.remove_prefix(primary_activity) -%}
 
 
@@ -166,8 +171,9 @@
 {{aggregation_dependency}}
 {%- endfor %}
 
+{%- set primary_cte = sql_graph['primary_activity_cte'] %}
 
-with {{sql_graph['primary_activity_cte']}} as (
+with {{primary_cte}} as (
     select
         {%- for sc in standard_columns -%}
         {% set primary_sc = dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])~'_'~sc %}
@@ -180,38 +186,6 @@ with {{sql_graph['primary_activity_cte']}} as (
         {%- endfor %}
     from {{ ref(activity_stream) }}
     where activity_name = '{{cleaned_primary_activity}}'
-)
-, enriched as (
-    select
-        {%- for col in primary_columns %}
-        {% if not loop.first %}, {% endif %}t1.{{col}}
-        {%- do enriched_columns.append(col) -%}
-        {% endfor %}
-        {% if 'previous' in sql_graph['join_requirements'] %}
-        {%- set col_name = 'previous_'~cleaned_primary_activity~'_activity_at' -%}
-        , max(t2.{{cleaned_primary_activity}}_activity_at) as {{col_name}}
-        {%- do enriched_columns.append(col_name) -%}
-        {%- endif %}
-        {%- if 'next' in sql_graph['join_requirements'] %}
-        {%- set col_name = 'next_'~cleaned_primary_activity~'_activity_at' -%}
-        , min(t3.{{cleaned_primary_activity}}_activity_at) as {{col_name}}
-        {%- do enriched_columns.append(col_name) -%}
-        {%- endif %}
-    from {{sql_graph['primary_activity_cte']}} t1
-    {% if 'previous' in sql_graph['join_requirements'] -%}
-    left join {{sql_graph['primary_activity_cte']}} t2
-        on t1.{{cleaned_primary_activity}}_{{entity_id}} = t2.{{cleaned_primary_activity}}_{{entity_id}}
-        and t1.{{cleaned_primary_activity}}_activity_at > t2.{{cleaned_primary_activity}}_activity_at
-    {%- endif %}
-    {%- if 'next' in sql_graph['join_requirements'] -%}
-    left join {{sql_graph['primary_activity_cte']}} t3
-        on t1.{{cleaned_primary_activity}}_{{entity_id}} = t3.{{cleaned_primary_activity}}_{{entity_id}}
-        and t1.{{cleaned_primary_activity}}_activity_at < t3.{{cleaned_primary_activity}}_activity_at
-    {%- endif %}
-    group by
-        {%- for col in primary_columns %}
-        {% if not loop.first -%}, {% endif -%}t1.{{col}}
-        {%- endfor %}
 )
 {% for secondary_activity in sql_graph['secondary_activities'].keys() -%}
 {%- set cleaned_secondary_activity = dbt_activity_schema.remove_prefix(secondary_activity) -%}
@@ -238,44 +212,35 @@ with {{sql_graph['primary_activity_cte']}} as (
 {%- set join_reqs = se['joins'][j] -%}
 , {{join_reqs['table_alias']}} as (
     select
-        enriched.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}}
-        , enriched.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
+        {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}}
+        , {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
         {%- for sm in join_reqs['aggregations'] %}
         , {{sm['aggregation_sql']}} as {{sm['aggregation_name']}}
         {%- endfor %}
-    from enriched
+    from {{primary_cte}}
     {%- set alias = join_reqs['table_alias'] %}
     left join {{se['cte']}} {{alias}}
-        on enriched.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}} = {{alias}}.{{secondary_activity}}_{{entity_id}}
-        {%- if join_reqs['after_ts'] is not none %}
-        and {{dbt_activity_schema.compile_timestamp_join(
+        on {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}} = {{alias}}.{{secondary_activity}}_{{entity_id}}
+        {{ dbt_activity_schema.compile_relationship_join(
             primary_activity=dbt_activity_schema.remove_prefix(sql_graph['primary_activity']),
+            primary_cte=primary_cte,
             secondary_activity=secondary_activity,
             secondary_alias=alias,
-            relative='after',
-            timestamp=join_reqs['after_ts']
-        )}}
-        {%- endif %}
-        {%- if join_reqs['before_ts'] is not none %}
-        and {{dbt_activity_schema.compile_timestamp_join(
-            primary_activity=dbt_activity_schema.remove_prefix(sql_graph['primary_activity']),
-            secondary_activity=secondary_activity,
-            secondary_alias=alias,
-            relative='before',
-            timestamp=join_reqs['before_ts']
-        )}}
-        {%- endif %}
+            relationship=join_reqs['relationship'],
+            nth_occurrence=none,
+            after_timestamp=join_reqs['after_ts'],
+            before_timestamp=join_reqs['before_ts']
+        ) }}
     group by
-        {%- for ec in enriched_columns %}
-        {% if not loop.first -%}, {% endif -%}enriched.{{ec}}
-        {%- endfor %}
+        {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}}
+        , {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
 )
 {% endfor -%}
 {%- endfor -%}
 , joined_full as (
     select
-        {%- for ec in enriched_columns %}
-        {% if not loop.first -%}, {% endif -%}enriched.{{ec}}
+        {%- for pc in primary_columns %}
+        {% if not loop.first -%}, {% endif -%}{{primary_cte}}.{{pc}}
         {%- endfor %}
         {%- for secondary_activity in sql_graph['secondary_activities'].keys() -%}
         {%- set se = sql_graph['secondary_activities'][secondary_activity] -%}
@@ -286,14 +251,14 @@ with {{sql_graph['primary_activity_cte']}} as (
         {%- endfor -%}
         {%- endfor -%}
         {% endfor %}
-    from enriched
+    from {{primary_cte}}
     {% for secondary_activity in sql_graph['secondary_activities'].keys() -%}
     {%- set se = sql_graph['secondary_activities'][secondary_activity] -%}
     {% for j in se['joins'].keys() %}
     {%- set join_reqs = se['joins'][j] -%}
     {%- set alias = join_reqs['table_alias'] -%}
     left join {{alias}}
-        on enriched.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id = {{alias}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
+        on {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id = {{alias}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
     {% endfor %}
     {%- endfor -%}
 

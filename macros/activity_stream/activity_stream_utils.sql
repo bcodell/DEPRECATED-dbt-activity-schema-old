@@ -54,7 +54,7 @@ cluster by activity_name, {{entity_id}}
 {% endmacro %}
 
 {% macro snowflake__get_cluster_statement(entity_id) %}
-cluster by activity_name, {{entity_id}}
+cluster by (activity_name, activity_occurrence in (1, NULL), activity_repeated_at is NULL, to_date(activity_at))
 {% endmacro %}
 
 {% macro bigquery__get_cluster_statement(entity_id) %}
@@ -140,6 +140,24 @@ vacuum {{relation}}
 {% endmacro %}
 
 
+{% macro get_activity_occurrence_col() %}
+    {{ return(adapter.dispatch('get_activity_occurrence_col', 'dbt_activity_schema')()) }}
+{% endmacro %}
+
+{% macro default__get_activity_occurrence_col() %}
+    {{ return('activity_occurrence') }}
+{% endmacro %}
+
+
+{% macro get_activity_repeated_at_col() %}
+    {{ return(adapter.dispatch('get_activity_repeated_at_col', 'dbt_activity_schema')()) }}
+{% endmacro %}
+
+{% macro default__get_activity_repeated_at_col() %}
+    {{ return('activity_repeated_at') }}
+{% endmacro %}
+
+
 {% macro get_activity_stream_schema(entity_id) %}
     {{ return(adapter.dispatch('get_activity_stream_schema', 'dbt_activity_schema')(entity_id)) }}
 {% endmacro %}
@@ -148,6 +166,8 @@ vacuum {{relation}}
 {%- set activity_ts_col = dbt_activity_schema.get_activity_ts_col() -%}
 {%- set activity_id_col = dbt_activity_schema.get_activity_id_col() -%}
 {%- set activity_name_col = dbt_activity_schema.get_activity_name_col() -%}
+{%- set activity_occurrence_col = dbt_activity_schema.get_activity_occurrence_col() -%}
+{%- set activity_repeated_at_col = dbt_activity_schema.get_activity_repeated_at_col() -%}
 {%- set attribues_col = dbt_activity_schema.get_attributes_col() -%}
 {%- set loaded_at_col = dbt_activity_schema.get_loaded_at_col() -%}
 {%- set base_columns = {
@@ -156,6 +176,8 @@ vacuum {{relation}}
     activity_name_col: {'data_type': type_string(), 'sql': activity_name_col},
     activity_ts_col: {'data_type': type_timestamp(), 'sql': activity_ts_col},
     attribues_col: {'data_type': dbt_activity_schema.type_json(), 'sql': attribues_col},
+    activity_occurrence_col: {'data_type': type_int(), 'sql': activity_occurrence_col},
+    activity_repeated_at_col: {'data_type': type_timestamp(), 'sql': activity_repeated_at_col},
     loaded_at_col: {'data_type': type_timestamp(), 'sql': current_timestamp()}
 } -%}
     {{ return(base_columns) }}
@@ -201,7 +223,7 @@ cluster by ({{activity_name_col}}, {{entity_id}})
 
 {% macro snowflake__get_cluster_keys(entity_id) %}
 {%- set activity_name_col = dbt_activity_schema.get_activity_name_col() -%}
-cluster by ({{entity_id}})
+cluster by (activity_name, activity_occurrence in (1, NULL), activity_repeated_at is NULL, to_date(activity_at))
 {% endmacro %}
 
 {% macro bigquery__get_cluster_keys(entity_id) %}
@@ -220,6 +242,18 @@ compound sortkey({{entity_id}}, {{activity_name_col}}, {{activity_ts_col}})
 -- noop - not supporting for now
 {% endmacro %}
 
+{% macro transient() %}
+    {{ return(adapter.dispatch('transient', 'dbt_activity_schema')()) }}
+{% endmacro %}
+
+{% macro default__transient() %}
+
+{% endmacro %}
+
+{% macro snowflake__transient() %}
+transient
+{% endmacro %}
+
 {% macro create_empty_activity_stream(entity_id, relation) -%}
     {{ return(adapter.dispatch('create_empty_activity_stream', 'dbt_activity_schema')(entity_id, relation)) }}
 {% endmacro %}
@@ -227,7 +261,7 @@ compound sortkey({{entity_id}}, {{activity_name_col}}, {{activity_ts_col}})
 {% macro default__create_empty_activity_stream(entity_id, relation) %}
 {%- set base_columns = dbt_activity_schema.get_activity_stream_schema(entity_id=entity_id) -%}
 
-create table {{relation.include(database=true)}} (
+create {{dbt_activity_schema.transient()}} table {{relation.include(database=true)}} (
 {% for key in base_columns.keys() %}
     {% if not loop.first %}, {% endif %}{{key}} {{base_columns[key]['data_type']}}
 {% endfor %}
