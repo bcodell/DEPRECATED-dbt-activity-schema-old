@@ -220,6 +220,18 @@ compound sortkey({{entity_id}}, {{activity_name_col}}, {{activity_ts_col}})
 -- noop - not supporting for now
 {% endmacro %}
 
+{% macro transient() %}
+    {{ return(adapter.dispatch('transient', 'dbt_activity_schema')()) }}
+{% endmacro %}
+
+{% macro default__transient() %}
+
+{% endmacro %}
+
+{% macro snowflake__transient() %}
+transient
+{% endmacro %}
+
 {% macro create_empty_activity_stream(entity_id, relation) -%}
     {{ return(adapter.dispatch('create_empty_activity_stream', 'dbt_activity_schema')(entity_id, relation)) }}
 {% endmacro %}
@@ -227,7 +239,7 @@ compound sortkey({{entity_id}}, {{activity_name_col}}, {{activity_ts_col}})
 {% macro default__create_empty_activity_stream(entity_id, relation) %}
 {%- set base_columns = dbt_activity_schema.get_activity_stream_schema(entity_id=entity_id) -%}
 
-create table {{relation.include(database=true)}} (
+create {{dbt_activity_schema.transient()}} table {{relation.include(database=true)}} (
 {% for key in base_columns.keys() %}
     {% if not loop.first %}, {% endif %}{{key}} {{base_columns[key]['data_type']}}
 {% endfor %}
