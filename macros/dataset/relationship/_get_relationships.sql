@@ -14,6 +14,7 @@
     'aggregate_before': dbt_activity_schema.join_aggregate_before,
     'aggregate_after': dbt_activity_schema.join_aggregate_after,
     'aggregate_in_between': dbt_activity_schema.join_aggregate_in_between,
+    'custom': dbt_activity_schema.join_custom,
 } -%}
 
 {%- do return(relationships) -%}
