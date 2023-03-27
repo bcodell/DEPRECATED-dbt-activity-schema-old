@@ -54,7 +54,7 @@ cluster by activity_name, {{entity_id}}
 {% endmacro %}
 
 {% macro snowflake__get_cluster_statement(entity_id) %}
-cluster by activity_name, {{entity_id}}
+cluster by (activity_name, activity_occurrence in (1, NULL), activity_repeated_at is NULL, to_date(activity_at))
 {% endmacro %}
 
 {% macro bigquery__get_cluster_statement(entity_id) %}
