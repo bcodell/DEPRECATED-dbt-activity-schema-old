@@ -217,7 +217,7 @@ with {{primary_cte}} as (
         {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}}
         , {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
     {% else %}
-        {{alias}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}}
+        {{alias}}.{{secondary_activity}}_{{entity_id}}
     {% endif %}
         {%- for sm in join_reqs['aggregations'] %}
         , {{sm['aggregation_sql']}} as {{sm['aggregation_name']}}
@@ -225,7 +225,6 @@ with {{primary_cte}} as (
     {% if join_reqs['relationship'] != 'aggregate_all_ever' %}
     from {{primary_cte}}
     left join {{se['cte']}} {{alias}}
-        on {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}} = {{alias}}.{{secondary_activity}}_{{entity_id}}
         on {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}} = {{alias}}.{{secondary_activity}}_{{entity_id}}
         {{ dbt_activity_schema.compile_relationship_join(
             primary_activity=dbt_activity_schema.remove_prefix(sql_graph['primary_activity']),
@@ -239,12 +238,13 @@ with {{primary_cte}} as (
         ) }}
     {% else %}
     from {{se['cte']}} {{alias}}
+    {% endif %}
     group by
         {% if join_reqs['relationship'] != 'aggregate_all_ever' %}
             {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}}
             , {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
         {% else %}
-            {{alias}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}}
+            {{alias}}.{{secondary_activity}}_{{entity_id}}
         {% endif %}
 )
 {% endfor -%}
@@ -273,7 +273,8 @@ with {{primary_cte}} as (
     {% if join_reqs['relationship'] != 'aggregate_all_ever' %}
         on {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id = {{alias}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
     {% else %}
-        on {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}} = {{alias}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}}
+        on {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}} = {{alias}}.{{secondary_activity}}_{{entity_id}}
+    {% endif %}
     {% endfor %}
     {%- endfor -%}
 
