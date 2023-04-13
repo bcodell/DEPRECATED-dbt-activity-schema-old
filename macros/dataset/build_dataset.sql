@@ -210,15 +210,20 @@ with {{primary_cte}} as (
 {%- set se = sql_graph['secondary_activities'][secondary_activity] -%}
 {%- for j in se['joins'].keys() -%}
 {%- set join_reqs = se['joins'][j] -%}
-, {{join_reqs['table_alias']}} as (
+{%- set alias = join_reqs['table_alias'] %}
+, {{alias}} as (
     select
+    {% if join_reqs['relationship'] != 'aggregate_all_ever' %}
         {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}}
         , {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
+    {% else %}
+        {{alias}}.{{secondary_activity}}_{{entity_id}}
+    {% endif %}
         {%- for sm in join_reqs['aggregations'] %}
         , {{sm['aggregation_sql']}} as {{sm['aggregation_name']}}
         {%- endfor %}
+    {% if join_reqs['relationship'] != 'aggregate_all_ever' %}
     from {{primary_cte}}
-    {%- set alias = join_reqs['table_alias'] %}
     left join {{se['cte']}} {{alias}}
         on {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}} = {{alias}}.{{secondary_activity}}_{{entity_id}}
         {{ dbt_activity_schema.compile_relationship_join(
@@ -231,9 +236,16 @@ with {{primary_cte}} as (
             after_timestamp=join_reqs['after_ts'],
             before_timestamp=join_reqs['before_ts']
         ) }}
+    {% else %}
+    from {{se['cte']}} {{alias}}
+    {% endif %}
     group by
-        {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}}
-        , {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
+        {% if join_reqs['relationship'] != 'aggregate_all_ever' %}
+            {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}}
+            , {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
+        {% else %}
+            {{alias}}.{{secondary_activity}}_{{entity_id}}
+        {% endif %}
 )
 {% endfor -%}
 {%- endfor -%}
@@ -258,7 +270,11 @@ with {{primary_cte}} as (
     {%- set join_reqs = se['joins'][j] -%}
     {%- set alias = join_reqs['table_alias'] -%}
     left join {{alias}}
+    {% if join_reqs['relationship'] != 'aggregate_all_ever' %}
         on {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id = {{alias}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_activity_id
+    {% else %}
+        on {{primary_cte}}.{{dbt_activity_schema.remove_prefix(sql_graph['primary_activity'])}}_{{entity_id}} = {{alias}}.{{secondary_activity}}_{{entity_id}}
+    {% endif %}
     {% endfor %}
     {%- endfor -%}
 
