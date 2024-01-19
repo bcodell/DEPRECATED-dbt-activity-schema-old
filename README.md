@@ -1,3 +1,5 @@
+# ⚠️ WARNING: This project is deprecated. Please use the new [dbt-activity-schema](https://github.com/bcodell/dbt-aql) instead. ⚠️
+
 # dbt-activity-schema
 A package for building and operating the [Activity Schema](https://www.activityschema.com/) data model using dbt.
 
